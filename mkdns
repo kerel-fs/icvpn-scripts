@@ -5,7 +5,7 @@ from optparse import OptionParser
 from socket import AF_INET, AF_INET6, inet_pton
 from formatter import Formatter
 from filereader import get_communities_data
-
+import dns.resolver
 
 class DnsmasqFormatter(Formatter):
     "Formatter for dnsmasq"
@@ -53,7 +53,7 @@ class UnboundForwardFormatter(Formatter):
 
 
 
-def create_config(srcdir, fmtclass, exclude=set(), filters=[]):
+def create_config(srcdir, fmtclass, exclude_zones, exclude=set(), filters=[]):
     """
     Generates a configuration using all files in srcdir
     (non-recursively) excluding communities from 'exclude'.
@@ -62,6 +62,7 @@ def create_config(srcdir, fmtclass, exclude=set(), filters=[]):
     results.
     """
     formatter = fmtclass()
+
     for community, data in get_communities_data(srcdir, exclude):
         try:
             domains = data['domains']
@@ -69,6 +70,9 @@ def create_config(srcdir, fmtclass, exclude=set(), filters=[]):
         except (TypeError, KeyError):
             continue
 
+        if exclude_zones:
+           bad_zones = find_zone_collisions(domains)
+ 
         formatter.add_comment("\n%s\n" % community)
 
         servers = filter(lambda d: all(f(d) for f in filters), nameservers)
@@ -79,9 +83,20 @@ def create_config(srcdir, fmtclass, exclude=set(), filters=[]):
         elif len(servers) == 0:
             formatter.add_comment("No valid servers found")
         else:
-            formatter.add_data(domains, servers)
+            formatter.add_data(list(set(domains) - set(bad_zones)), servers)
 
     print(formatter.finalize())
+
+def find_zone_collisions(domains):
+   bad_zones = list()
+   for domain in domains:
+       try:
+           for answer in dns.resolver.query(domain):
+               print domain
+               bad_zones.append(domain)
+       except:
+          pass
+   return bad_zones
 
 if __name__ == "__main__":
     def try_inet_pton(af, ip):
@@ -117,6 +132,10 @@ if __name__ == "__main__":
                       help="Exclude COMMUNITY (may be repeated)",
                       metavar="COMMUNITY",
                       default=[])
+    parser.add_option("--exclude-collisions", action="store_true",
+                      dest="exclude_zones",
+                      help="""Exclude global existing zones to avoid
+                      misconfigured zone files.""")
     parser.add_option("--filter", dest="filter",
                       help="""Only include certain servers.
                               Possible choices: %s""" %
@@ -127,5 +146,6 @@ if __name__ == "__main__":
 
     create_config(options.src,
                   formatters[options.fmt],
+                  options.exclude_zones,
                   set(options.exclude),
                   [filters[options.filter]] if options.filter else [])
