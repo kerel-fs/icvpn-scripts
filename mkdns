@@ -92,7 +92,6 @@ def find_zone_collisions(domains):
    for domain in domains:
        try:
            for answer in dns.resolver.query(domain):
-               print domain
                bad_zones.append(domain)
        except:
           pass
