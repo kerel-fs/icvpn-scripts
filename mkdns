@@ -7,6 +7,7 @@ from formatter import Formatter
 from filereader import get_communities_data
 import dns.resolver
 
+
 class DnsmasqFormatter(Formatter):
     "Formatter for dnsmasq"
     def add_data(self, domains, servers):
@@ -43,14 +44,13 @@ class BindForwardFormatter(Formatter):
 class UnboundForwardFormatter(Formatter):
     "Formatter for unbound using forward zone"
     def add_data(self, domains, servers):
-       for domain in domains:
-          self.config.append(dedent("""
-             forward-zone:
-                name: "%s" """ % (domain)).lstrip())
-          for server in servers:
-             self.config.append("".join(["   ",dedent("""
-                forward-addr: %s """ % (server)).lstrip()]))
-
+        for domain in domains:
+            self.config.append(dedent("""
+                forward-zone:
+                    name: "%s" """ % (domain)).lstrip())
+            for server in servers:
+                self.config.append("".join(["   ", dedent("""
+                    forward-addr: %s """ % (server)).lstrip()]))
 
 
 def create_config(srcdir, fmtclass, exclude_zones, exclude=set(), filters=[]):
@@ -71,8 +71,8 @@ def create_config(srcdir, fmtclass, exclude_zones, exclude=set(), filters=[]):
             continue
 
         if exclude_zones:
-           bad_zones = find_zone_collisions(domains)
- 
+            bad_zones = find_zone_collisions(domains)
+
         formatter.add_comment("\n%s\n" % community)
 
         servers = filter(lambda d: all(f(d) for f in filters), nameservers)
@@ -87,15 +87,16 @@ def create_config(srcdir, fmtclass, exclude_zones, exclude=set(), filters=[]):
 
     print(formatter.finalize())
 
+
 def find_zone_collisions(domains):
-   bad_zones = list()
-   for domain in domains:
-       try:
-           for answer in dns.resolver.query(domain):
-               bad_zones.append(domain)
-       except:
-          pass
-   return bad_zones
+    bad_zones = list()
+    for domain in domains:
+        try:
+            for answer in dns.resolver.query(domain):
+                bad_zones.append(domain)
+        except:
+            pass
+    return bad_zones
 
 if __name__ == "__main__":
     def try_inet_pton(af, ip):
